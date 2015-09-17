@@ -33,15 +33,21 @@ filtersplits <- function(splits, nmin, minleaf){
 
 # Filtersplits helper function.
 checksplit <- function(split, nmin, minleaf){
-  i <- split[[1]] # impurity is stored in the first position
-  size.left <- length(split[[2]]) # left part of the split
-  size.right <- length(split[[3]]) # right part of the split
+  left.i <- split[[1]][[1]] # impurity is stored in the first position
+  left.size <- length(split[[1]][[2]])  # left part of the split
+
+  right.i <- split[[2]][[1]] # impurity is stored in the first position
+  right.size <- length(split[[2]][[2]])  # left part of the split
   
-  if (i == 0){ # its a leaf
-    return (size.left >= minleaf & size.right >= minleaf)
-  } else { # its an internal node
-    return (size.left >= nmin & size.right >= nmin)
+  validate <- function(i, size){
+    if(i == 0){ # its a leaf
+      return (size >= minleaf)
+    } else { # its a node
+      return (size >= nmin)
+    }
   }
+  
+  return (validate(left.i, left.size) & validate(right.i, right.size))
 }
 
 # Returns a list of all possible splits on one column with their scores.
@@ -77,7 +83,8 @@ split <- function(x, y, c, pivot){
   i.right = impurity(y.right)*(length(y.right)/y.length)
   score = i.left + i.right
   
-  return(list(score, x.left, x.right))
+  return(list(list(i.left, x.left), list(i.right, x.right)))
+  # return(list(score, x.left, x.right))
 }
 
 # Grow a tree.
@@ -106,10 +113,10 @@ credit.dat <- read.csv('~/UU/MDM/datamining/assignment1/data/credit.txt')
 classes <- (credit.dat[,6])
 
 a <- columnsplits(credit.dat, classes, 4)
-s <- filtersplits(a,2,1)
+b <- filtersplits(a, 2, 2)
 
 print(a)
-print(s)
+print(b)
 
 
 
