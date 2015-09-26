@@ -73,8 +73,8 @@ split <- function(x, y, c, pivot){
   x.ordered <- x[ordering,]
   y.ordered <- y[ordering]
   
-  x.left <- which(x.ordered[,c] < pivot)
-  x.right <- which(x.ordered[,c] > pivot)
+  x.left <- rownames(subset(x, x[,c] < pivot))
+  x.right <- rownames(subset(x, x[,c] > pivot))
   
   offset <- length(x.left)
   
@@ -112,6 +112,37 @@ minsplit <- function(s1, s2){
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 tree.grow <- function(x, y, nmin, minleaf){
+  possiblesplits <- allsplits(x, y, nmin, minleaf)
+  columns.optimal <- lapply(possiblesplits, bestsplit)
+  optimal <- bestsplit(columns.optimal)
+  
+  split.left.i <- optimal[[1]][[1]]
+  split.left.rows <- x[optimal[[1]][[2]],]
+  
+  split.right.i <- optimal[[2]][[1]]
+  split.right.rows <- x[optimal[[2]][[2]],]
+  
+  split.column <- optimal[[3]]
+  split.pivot <- optimal[[4]]
+  
+  current.rows.indices <- rownames(x)
+  
+  
+  if(split.left.i > 0){
+  
+  } else {
+    return (optimal[[1]][[2]])
+  }
+  
+  if(split.right.i > 0){
+    right.result <- tree.grow(split.right.rows, )
+    right.node <- list()
+  } else {
+    return (optimal[[2]][[2]])
+  }
+
+  # return(split.right.rows)
+  return(optimal)
   
 }
 
@@ -132,11 +163,9 @@ credit.dat <- read.csv('~/UU/MDM/datamining/assignment1/data/credit.txt')
 classes <- (credit.dat[,6])
 credit.dat <- (credit.dat[,-6])
 
-splits <- allsplits(credit.dat, classes, 1, 1)
-columns.optimal <- lapply(splits, bestsplit)
+b <- tree.grow(credit.dat, classes, 1, 1)
 
-print(splits[[1]][[1]])
-
+print(b)
 
 
 
