@@ -19,7 +19,10 @@ splitpoints <- function(vect){
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 allsplits <- function(x, y, nmin, minleaf){
-  
+  splits <- (mapply(function(c) columnsplits(x,y,c), 1:length(x)))
+  filtered <- (lapply(splits, function(s) filtersplits(s, nmin, minleaf)))
+
+  return(filtered)
 }
 
 # Given a list of splits, filter out the splits that do not adhere to the nmin and minleaf constraints.
@@ -27,8 +30,8 @@ allsplits <- function(x, y, nmin, minleaf){
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 filtersplits <- function(splits, nmin, minleaf){
-  eligible <- (apply(splits, 2, function(s) checksplit(s, nmin, minleaf)))
-  return (splits[,eligible])
+  eligible <- Filter(function(s) checksplit(s, nmin, minleaf), splits)
+  return (eligible)
 }
 
 # Filtersplits helper function.
@@ -56,7 +59,7 @@ checksplit <- function(split, nmin, minleaf){
 # c - column index.
 columnsplits <- function(x, y, c){
   potentialsplits <- splitpoints(x[,c])
-  splits <- mapply(function(pivot) split(x, y, c, pivot), potentialsplits)
+  splits <- lapply(potentialsplits, function(pivot) split(x, y, c, pivot))
   return(splits)
 }
 
@@ -83,8 +86,24 @@ split <- function(x, y, c, pivot){
   i.right = impurity(y.right)*(length(y.right)/y.length)
   score = i.left + i.right
   
-  return(list(list(i.left, x.left), list(i.right, x.right)))
-  # return(list(score, x.left, x.right))
+  return(list(list(i.left, x.left), list(i.right, x.right), c, pivot))
+}
+
+# Given a list of splits, returns the best one.
+bestsplit <- function(splits){
+  return (Reduce(minsplit, splits, splits[[1]]))
+}
+
+# Given two splits, returns the split with the lowest impurity.
+minsplit <- function(s1, s2){
+  score1 <- s1[[1]][[1]] + s1[[2]][[1]]
+  score2 <- s2[[1]][[1]] + s2[[2]][[1]]
+  
+  if(score1 < score2){
+    return(s1)
+  } else {
+    return(s2)
+  }
 }
 
 # Grow a tree.
@@ -111,12 +130,14 @@ tree.simplify <- function(tr){
 credit.dat <- read.csv('~/UU/MDM/datamining/assignment1/data/credit.txt')
 
 classes <- (credit.dat[,6])
+credit.dat <- (credit.dat[,-6])
 
-a <- columnsplits(credit.dat, classes, 4)
-b <- filtersplits(a, 2, 2)
+splits <- allsplits(credit.dat, classes, 1, 1)
+columns.optimal <- lapply(splits, bestsplit)
 
-print(a)
-print(b)
+print(splits[[1]][[1]])
+
+
 
 
 
