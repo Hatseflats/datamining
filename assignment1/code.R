@@ -1,3 +1,4 @@
+
 # Gini index, two class case.
 impurity <- function(vect){
   freq <- (sum(vect == 0))/length(vect)
@@ -49,7 +50,7 @@ checksplit <- function(split, nmin, minleaf){
       return (size >= nmin)
     }
   }
-  
+
   return (validate(left.i, left.size) & validate(right.i, right.size))
 }
 
@@ -81,7 +82,7 @@ split <- function(x, y, c, pivot){
   y.left <- y.ordered[1:offset]
   y.right <- y.ordered[offset+1:(length(y)-offset)]
   y.length <- length(y)
-  
+
   i.left = impurity(y.left)*(length(y.left)/y.length)
   i.right = impurity(y.right)*(length(y.right)/y.length)
   score = i.left + i.right
@@ -111,9 +112,13 @@ minsplit <- function(s1, s2){
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 tree.grow <- function(x, y, nmin, minleaf){
-  
+
   possiblesplits <- allsplits(x, y, nmin, minleaf)
   possiblesplits <- Filter(function(column) length(column) > 0, possiblesplits)
+  
+  if(length(possiblesplits) == 0){
+    return(list(rownames(x), y))
+  }
   
   columns.optimal <- lapply(possiblesplits, bestsplit)
   optimal <- bestsplit(columns.optimal)
@@ -152,14 +157,32 @@ tree.grow <- function(x, y, nmin, minleaf){
 # tr - a tree object
 tree.classify <- function(x, tr){
   
+  classify <- function(row, tree){
+    leaf <- findleaf(row,tree)
+    return(majorityclass(leaf))
+  }
+  
+  return(apply(x, 1, function(x_) classify(x_, tr)))
 }
 
-# Predicts the class of x.
+# Given a label of class vectors, returns the majority class
+majorityclass <- function(y){
+ count.1 <- sum(y == 1)
+ count.0 <- sum(y == 0)
+ 
+  if(count.0 > count.1){
+    return (0)
+  } else {
+    return (1)
+  }
+}
+
+# Finds the leaf that x should belong to
 # x - input row.
 # tr - a tree object.
-tree.classify.findleaf <- function(x, tr){
-  if(length(x) == 2){ # leaves only have a list of rownumbers and hteir classes
-    return(x)
+findleaf <- function(x, tr){
+  if(length(tr) == 2){ # leaves only have a list of rownumbers and their classes
+    return(tr[[2]])
   } else { # nodes are of length 6.
     left <- tr[[2]]
     right <- tr[[3]]
@@ -169,27 +192,117 @@ tree.classify.findleaf <- function(x, tr){
     value <- x[column]
     
     if(value < pivot){
-      result <- tree.classify.row(x, left)
+      result <- findleaf(x, left)
     } else {
-      result <- tree.classify.row(x, right)
+      result <- findleaf(x, right)
     }
   }
 }
 
 # tr - a tree object
 tree.simplify <- function(tr){
+  if(isleaf(tr)){
+    return(tr)
+  }
   
+  leftchild <- tr[[2]]
+  rightchild <- tr[[3]]
+  
+  if(isleaf(leftchild) & isleaf(rightchild)){
+    leftmajority <- majorityclass(leftchild[[2]])
+    rightmajority <- majorityclass(rightchild[[2]])
+    
+    if(leftmajority == rightmajority){
+      return(list(tr[[1]], tr[[6]]))
+    }
+  } else {
+    return(list(tr[[1]], tree.simplify(tr[[2]]), tree.simplify(tr[[3]]), tr[[4]], tr[[5]], tr[[6]]))
+  }
 }
 
-credit.dat <- read.csv('~/UU/MDM/datamining/assignment1/data/credit.txt')
+isleaf <- function(tr){
+  if(length(tr) == 2){
+    return(TRUE)
+  } else {
+    return(FALSE)
+  }
+}
 
-classes <- (credit.dat[,6])
-credit.dat <- (credit.dat[,-6])
+counterrors <- function(classes, predictions){
+  results <- data.frame(class=classes,prediction=predictions)
+  wrong <- 0
+  
+  for(i in 1:nrow(results)){
+    row <- results[i,]
+    
+    if(row[,1] != row[,2]){
+      wrong <- wrong + 1
+    }
+  }
+  return(wrong)
+}
 
-tr <- tree.grow(credit.dat, classes, 2, 1)
+getfolds <- function(data, n){
+  
+  folds <- list()
+  input <- data
+  while(nrow(input) != 0){
 
-print(tr)
+    fold <- input[sample(nrow(input), n),]
+    remainder <- input[-(which(rownames(input) %in% rownames(fold))),]
+    input <- remainder
+    folds[[length(folds)+1]] <- fold 
+  }
+  return(folds)
+}
 
+crossvalidation <- function(x, y, nmin, minleaf){
+  trainingset <- x[sample(nrow(x), 200),]
+  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
+  trainingset.classes <- y[trainingset.indices]
+  
+  testsample <- x[-(trainingset.indices),]
+  
+  folds <- getfolds(trainingset, 20)
+  
+  foldtree <- function(fold, trainingset, classes, nmin, minleaf){
+    fold.indices <- which(rownames(trainingset) %in% rownames(fold))
+    fold.classes <- classes[fold.indices]
+    
+    data <- trainingset[-fold.indices,]
+    data.classes <- classes[-fold.indices]
+    
+    tree <- tree.grow(data, data.classes, nmin, minleaf)
+    predictions <- tree.classify(fold, tree)
+    errors <- counterrors(fold.classes, predictions)
+    
+    return(list(errors))
+  }
+  
+  start.time <- Sys.time()
+
+  result <- lapply(folds, function(f) foldtree(f, trainingset, trainingset.classes, nmin, minleaf))
+  
+  end.time <- Sys.time()
+  time.taken <- end.time - start.time
+  
+  print(time.taken)
+  
+  return(result)
+}
+
+main <- function(){
+  data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
+  classes <- data[,length(data)]
+  data <- data[,1:length(data)-1]
+  
+  results <- crossvalidation(data, classes, 1, 1)
+  
+  print(results)
+  
+}  
+
+main()
 
 
 
