@@ -20,10 +20,19 @@ splitpoints <- function(vect){
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 allsplits <- function(x, y, nmin, minleaf){
-  splits <- (mapply(function(c) columnsplits(x,y,c), colnames(x)))
-  filtered <- (lapply(splits, function(s) filtersplits(s, nmin, minleaf)))
+  column.names <- numeric.attributes()
+  
+  numeric.splits <- mapply(function(c) columnsplits.numeric(x,y,c), column.names)
+  numeric.filtered <- lapply(numeric.splits, function(s) filtersplits(s, nmin, minleaf))
+  
+  categories <- categorical.attributes()
+  categorical.sets <- lapply(categories, function(cat) categorical.splitpoints(x[,cat], y))
+  
+  # ugh
+  categorical.splits <- lapply(categorical.sets, function(set) lapply(set, function(subset) split.categorical(x, y, subset)))
+  categorical.filtered <- lapply(categorical.splits, function(s) filtersplits(s, nmin, minleaf))
 
-  return(filtered)
+  return(append(categorical.filtered, numeric.filtered))
 }
 
 # Given a list of splits, filter out the splits that do not adhere to the nmin and minleaf constraints.
@@ -37,13 +46,16 @@ filtersplits <- function(splits, nmin, minleaf){
 
 # Filtersplits helper function.
 checksplit <- function(split, nmin, minleaf){
-  left.i <- split[[1]][[1]] # impurity is stored in the first position
-  left.size <- length(split[[1]][[2]])  # left part of the split
+  left.i <- split[[2]][[1]] # impurity is stored in the first position
+  left.size <- length(split[[2]][[2]])  # left part of the split
 
-  right.i <- split[[2]][[1]] # impurity is stored in the first position
-  right.size <- length(split[[2]][[2]])  # left part of the split
+  right.i <- split[[3]][[1]] # impurity is stored in the first position
+  right.size <- length(split[[3]][[2]])  # left part of the split
   
   validate <- function(i, size){
+    if(size == 0){
+      return(FALSE)
+    }
     if(i == 0){ # its a leaf
       return (size >= minleaf)
     } else { # its a node
@@ -58,9 +70,9 @@ checksplit <- function(split, nmin, minleaf){
 # x - input dataframe.
 # y - classes vector.
 # c - column index.
-columnsplits <- function(x, y, c){
+columnsplits.numeric <- function(x, y, c){
   potentialsplits <- splitpoints(x[,c])
-  splits <- lapply(potentialsplits, function(pivot) split(x, y, c, pivot))
+  splits <- lapply(potentialsplits, function(pivot) split.numeric(x, y, c, pivot))
   return(splits)
 }
 
@@ -69,7 +81,7 @@ columnsplits <- function(x, y, c){
 # y - classes vector.
 # c - column index.
 # pivot - value to split on.
-split <- function(x, y, c, pivot){
+split.numeric <- function(x, y, c, pivot){
   ordering <- order(x[,c])
   x.ordered <- x[ordering,]
   y.ordered <- y[ordering]
@@ -87,7 +99,7 @@ split <- function(x, y, c, pivot){
   i.right = impurity(y.right)*(length(y.right)/y.length)
   score = i.left + i.right
   
-  return(list(list(i.left, x.left), list(i.right, x.right), c, pivot))
+  return(list("NUMERIC", list(i.left, x.left), list(i.right, x.right), c, pivot))
 }
 
 # Given a list of splits, returns the best one.
@@ -97,8 +109,8 @@ bestsplit <- function(splits){
 
 # Given two splits, returns the split with the lowest impurity.
 minsplit <- function(s1, s2){
-  score1 <- s1[[1]][[1]] + s1[[2]][[1]]
-  score2 <- s2[[1]][[1]] + s2[[2]][[1]]
+  score1 <- s1[[2]][[1]] + s1[[3]][[1]]
+  score2 <- s2[[2]][[1]] + s2[[3]][[1]]
   
   if(score1 <= score2){
     return(s1)
@@ -123,18 +135,23 @@ tree.grow <- function(x, y, nmin, minleaf){
   columns.optimal <- lapply(possiblesplits, bestsplit)
   optimal <- bestsplit(columns.optimal)
 
-  left.i <- optimal[[1]][[1]]
-  left.rownames <- optimal[[1]][[2]]
+  left.i <- optimal[[2]][[1]]
+  left.rownames <- optimal[[2]][[2]]
   left.classes <- y[which(rownames(x) %in% left.rownames)]
   left.rows <- x[left.rownames,]
   
-  right.i <- optimal[[2]][[1]]
-  right.rownames <- optimal[[2]][[2]]
+  right.i <- optimal[[3]][[1]]
+  right.rownames <- optimal[[3]][[2]]
   right.classes <- y[which(rownames(x) %in% right.rownames)]
   right.rows <- x[right.rownames,]
   
-  split.column <- optimal[[3]]
-  split.pivot <- optimal[[4]]
+  split.info <- list
+  
+  if(optimal[[1]] == "NUMERIC"){
+    split.info <- list("NUMERIC", optimal[[4]], optimal[[5]])
+  } else {
+    split.info <- list("CATEGORICAL", optimal[[4]])
+  }
   
   if(left.i > 0){
     left.result <- tree.grow(left.rows, left.classes, nmin, minleaf)
@@ -148,7 +165,7 @@ tree.grow <- function(x, y, nmin, minleaf){
     right.result <- list(right.rownames, right.classes)
   }
   
-  node <- list(rownames(x), left.result, right.result, split.column, split.pivot, y)
+  node <- list(rownames(x), left.result, right.result, y, split.info)
   return(node)
 }
 
@@ -181,20 +198,35 @@ majorityclass <- function(y){
 # x - input row.
 # tr - a tree object.
 findleaf <- function(x, tr){
-  if(length(tr) == 2){ # leaves only have a list of rownumbers and their classes
+  if(isleaf(tr)){ # leaves only have a list of rownumbers and their classes
     return(tr[[2]])
   } else { # nodes are of length 6.
     left <- tr[[2]]
     right <- tr[[3]]
-    column <- tr[[4]]
-    pivot <- tr[[5]]
     
-    value <- x[column]
+    info <- tr[[5]]
     
-    if(value < pivot){
-      result <- findleaf(x, left)
+    if(info[[1]] == 'NUMERIC') {
+      column <- info[[2]]
+      pivot <- info[[3]]
+      
+      value <- x[column]
+      
+      if(value < pivot){
+        result <- findleaf(x, left)
+      } else {
+        result <- findleaf(x, right)
+      }
+      return(result)
     } else {
-      result <- findleaf(x, right)
+      columns <- info[[2]]
+      
+      if(categorical.subset(x, columns)){
+        result <- findleaf(x, left)
+      } else {
+        result <- findleaf(x, right)
+      }
+      return(result)
     }
   }
 }
@@ -279,29 +311,97 @@ crossvalidation <- function(x, y, nmin, minleaf){
     return(list(errors))
   }
   
-  start.time <- Sys.time()
-
   result <- lapply(folds, function(f) foldtree(f, trainingset, trainingset.classes, nmin, minleaf))
   
-  end.time <- Sys.time()
-  time.taken <- end.time - start.time
-  
-  print(time.taken)
-  
   return(result)
+}
+
+# returns true if any of the columns in 'columns' is 1 for the given row. 
+categorical.subset <- function(row, columns){
+  s <- sapply(columns, function(c) row[c] == 1)
+  return(any(s))
+}
+
+split.categorical <- function(x, y, s){
+  rows <- apply(x, 1, function(row) categorical.subset(row, s))
+  
+  x.left <- rownames(x[rows,])
+  x.right <- rownames(x[!rows,])
+  
+  y.left <- y[which(rownames(x) %in% x.left)]
+  y.right <- y[which(rownames(x) %in% x.right)]
+  
+  y.length <- length(y)
+  
+  i.left = impurity(y.left)*(length(y.left)/y.length)
+  i.right = impurity(y.right)*(length(y.right)/y.length)
+  
+  score = i.left + i.right
+  
+  return(list("CATEGORICAL", list(i.left, x.left), list(i.right, x.right), s))
+}
+
+
+categorical.splitpoints <- function(data, classes){
+  
+  calcprob <- function(col, classes){
+    m <- matrix(c(col, classes), nrow=length(classes), ncol=2)
+    total <- sum(m[,1] == 1)
+    zeroes <- sum(m[,1] == 1 & m[,2] == 0)
+
+    return(zeroes/total)
+  }
+  
+  result <- apply(data, 2, function(x) calcprob(x,classes))
+  result <- sort(result)
+  
+  cat.splits <- list()
+  
+  for(i in 1:(length(result)-1)){
+    cat.splits[length(cat.splits)+1] <- list(names(result)[1:i])
+  }
+  
+  return(cat.splits)
+}
+
+numeric.attributes <- function(){
+  return(list("Age","Sex","RestBP","Chol","Fbs","RestECG","MaxHR","ExAng","Oldpeak","Slope","Ca"))
+}
+
+categorical.attributes <- function(){
+  cat1 <- c("ChestPain.asymptomatic","ChestPain.nonanginal","ChestPain.nontypical","ChestPain.typical")
+  cat2 <- c("Thal.fixed","Thal.normal","Thal.reversable")
+  
+  return(list(cat1, cat2))
 }
 
 main <- function(){
   data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
   classes <- data[,length(data)]
   data <- data[,1:length(data)-1]
-  
-  results <- crossvalidation(data, classes, 1, 1)
-  
-  print(results)
-  
-}  
 
+#   tree <- tree.grow(data,classes,1,1)
+#   predictions <- tree.classify(data,tree)
+#   print(counterrors(classes, predictions))
+
+    
+    start.time <- Sys.time()
+  
+    results <- crossvalidation(data, classes, 20, 5)
+    
+    end.time <- Sys.time()
+    time.taken <- end.time - start.time
+    
+    print(time.taken)
+    
+    total <- 0
+    for(i in 1:length(results)){
+      row <- results[[i]]
+      total <- total + row[[1]]
+    }
+    
+    print(total/10)
+}  
 main()
 
 
