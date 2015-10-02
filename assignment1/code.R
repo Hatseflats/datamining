@@ -21,16 +21,15 @@ splitpoints <- function(vect){
 # minleaf - minimum number of observations in a leaf.
 allsplits <- function(x, y, nmin, minleaf){
   column.names <- numeric.attributes()
-  
   numeric.splits <- mapply(function(c) columnsplits.numeric(x,y,c), column.names)
   numeric.filtered <- lapply(numeric.splits, function(s) filtersplits(s, nmin, minleaf))
   
   categories <- categorical.attributes()
   categorical.sets <- lapply(categories, function(cat) categorical.splitpoints(x[,cat], y))
-  
   # ugh
   categorical.splits <- lapply(categorical.sets, function(set) lapply(set, function(subset) split.categorical(x, y, subset)))
   categorical.filtered <- lapply(categorical.splits, function(s) filtersplits(s, nmin, minleaf))
+  
 
   return(append(categorical.filtered, numeric.filtered))
 }
@@ -203,7 +202,6 @@ findleaf <- function(x, tr){
   } else { # nodes are of length 6.
     left <- tr[[2]]
     right <- tr[[3]]
-    
     info <- tr[[5]]
     
     if(info[[1]] == 'NUMERIC') {
@@ -220,7 +218,7 @@ findleaf <- function(x, tr){
       return(result)
     } else {
       columns <- info[[2]]
-      
+
       if(categorical.subset(x, columns)){
         result <- findleaf(x, left)
       } else {
@@ -290,6 +288,7 @@ getfolds <- function(data, n){
 
 crossvalidation <- function(x, y, nmin, minleaf){
   trainingset <- x[sample(nrow(x), 200),]
+  trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
   trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
   trainingset.classes <- y[trainingset.indices]
   
@@ -298,6 +297,8 @@ crossvalidation <- function(x, y, nmin, minleaf){
   folds <- getfolds(trainingset, 20)
   
   foldtree <- function(fold, trainingset, classes, nmin, minleaf){
+    fold <- fold[order(as.numeric(rownames(fold))),]
+
     fold.indices <- which(rownames(trainingset) %in% rownames(fold))
     fold.classes <- classes[fold.indices]
     
@@ -308,7 +309,9 @@ crossvalidation <- function(x, y, nmin, minleaf){
     predictions <- tree.classify(fold, tree)
     errors <- counterrors(fold.classes, predictions)
     
-    return(list(errors))
+    errorrate <- errors/(nrow(fold))
+    
+    return(list(errorrate, tree.size(tree)))
   }
   
   result <- lapply(folds, function(f) foldtree(f, trainingset, trainingset.classes, nmin, minleaf))
@@ -335,8 +338,6 @@ split.categorical <- function(x, y, s){
   
   i.left = impurity(y.left)*(length(y.left)/y.length)
   i.right = impurity(y.right)*(length(y.right)/y.length)
-  
-  score = i.left + i.right
   
   return(list("CATEGORICAL", list(i.left, x.left), list(i.right, x.right), s))
 }
@@ -374,36 +375,90 @@ categorical.attributes <- function(){
   
   return(list(cat1, cat2))
 }
+# Returns the amount of internal nodes and leaves in a tree.
+# Tree - a tree object.
+tree.size <- function(tree){
+  if(isleaf(tree)){
+    return (c(0,1))
+  } 
+  
+  left.size <- tree.size(tree[[2]])
+  right.size <- tree.size(tree[[3]])
+  
+  result <- c(1,0) + left.size + right.size
+  
+  return(result)
+}
+
+parameterexperiment <- function(data, classes){
+  
+  runcrossval <- function(data, classes, runs, nmin, minleaf){
+    totalerrors <- 0
+    totalsize <- c(0,0)
+    totaltime <- 0
+    
+    for (i in 1:runs){
+      start.time <- Sys.time()
+    
+      results <- crossvalidation(data, classes, nmin, minleaf)
+      
+      end.time <- Sys.time()
+      time.taken <- end.time - start.time
+      totaltime <- totaltime + time.taken
+      
+      for(i in 1:length(results)){
+        row <- results[[i]]
+        totalerrors <- totalerrors + row[[1]]
+        totalsize <- totalsize + row[[2]]
+      }
+    }
+    
+    avgerrors <- totalerrors/(10*runs)
+    avgsize <- totalsize/(10*runs)
+    avgtime <- totaltime/(10*runs)
+    
+    return(c(avgerrors, avgsize, avgtime))
+  }
+  result <- runcrossval(data,classes,1,50,10)
+  
+  return(result)
+}
+
 
 main <- function(){
   data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
   classes <- data[,length(data)]
-  data <- data[,1:length(data)-1]
+  data <- data[,1:(length(data)-1)]
 
-#   tree <- tree.grow(data,classes,1,1)
+  
+  a <- parameterexperiment(data, classes)
+  print(a)
+#   trainingset <- data[sample(nrow(data), 10),]
+#   trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
+#   trainingset.indices <- which(rownames(data) %in% rownames(trainingset))
+#   trainingset.classes <- classes[trainingset.indices]
+#   
+#   print(rownames(trainingset))
+#   
+#   print(trainingset[,"AHD"][1:10])
+#   print(trainingset.classes[1:10])
+#   
+#   folds <- getfolds(trainingset,20)
+#   
+#   fold <- folds[[1]]
+  
+  # print(fold[,"AHD"])
+#   
+#   fold.indices <- which(rownames(trainingset) %in% rownames(fold))
+#   fold.classes <- trainingset.classes[fold.indices]
+#   
+  # print(fold.classes)
+
+  # tree <- tree.grow(data,classes,2,1)
 #   predictions <- tree.classify(data,tree)
 #   print(counterrors(classes, predictions))
 
     
-    start.time <- Sys.time()
-  
-    results <- crossvalidation(data, classes, 20, 5)
-    
-    end.time <- Sys.time()
-    time.taken <- end.time - start.time
-    
-    print(time.taken)
-    
-    total <- 0
-    for(i in 1:length(results)){
-      row <- results[[i]]
-      total <- total + row[[1]]
-    }
-    
-    print(total/10)
 }  
 main()
-
-
-
 
