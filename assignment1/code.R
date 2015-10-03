@@ -512,8 +512,8 @@ parameterexperiment <- function(data, classes){
   nmin <- 0
   minleaf <- 0
   
-  for(i in 1:20){
-    nmin <- nmin + 4
+  for(i in 1:24){
+    nmin <- nmin + 3
     minleaf <- minleaf + 1
     
     result <- c(nmin, minleaf, runcrossval(data,classes,5,nmin,minleaf))
@@ -527,6 +527,9 @@ parameterexperiment <- function(data, classes){
 # main function
 main <- function(){
   data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
+  
+  print(data)
+  return(1)
   classes <- data[,length(data)]
   data <- data[,1:(length(data)-1)]
 

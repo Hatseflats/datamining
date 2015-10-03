@@ -1,18 +1,42 @@
 \documentclass[a4paper,12pt]{scrartcl}
 \usepackage{graphicx}
-\usepackage[english]{babel}
-\usepackage{algorithm}
-\usepackage[noend]{algpseudocode}
-\usepackage[toc,page]{appendix}
 \usepackage[none]{hyphenat}
+\usepackage{pgfplots}
+\def\labelitemi{--}
+
+\pgfplotsset{compat=1.9} 
 
 \begin{document}
 \title{Classification Trees}
-\subtitle{Data mining 2015: assignment 1}
+\subtitle{Data Mining 2015: assignment 1}
 \author{Sebastiaan Jong (5546303) \& Bas Geerts (5568978)}
 \date{}
 \maketitle
+\noindent
+This report is written for the first assignment of the Data Mining (2015) course at Utrecht University. The goal of this assignment was to write a function in the R programming language that constructs a classification tree on a certain dataset, and to figure out efficient parameters for this tree.
+\\
+For this assignment we used the Heart Disease dataset from the University of California, Irvine machine learning repository. The preprocessed version for this assignment contains 297 instances and 14 attributes. A brief description of the used attributes:
+\begin{enumerate} \itemsep0pt
+	\renewcommand\labelitemi{--}
+	\item Age, numeric attribute.
+	\item Sex, categorical attribute.
+	\item ChestPain, categorical attribute.
+	\item RestBP, numeric attribute, resting bloodpressure.
+	\item Chol, numeric attribute, serum cholesterol.
+	\item Fbs, categorical attribute, fasting bloodsugar test result. 
+	\item RestECG, categorical attribute, resting electrocardiographic results.
+	\item MaxHR, numeric attribute, maximum heart rate achieved.
+	\item ExAng, categorical attribute, exercise induced angina. 
+	\item Oldpeak, numeric attribute, exercise induced ST-depression. 
+	\item Slope, categorical attribute, slope of the peak exercise ST segment.
+	\item Ca, numeric attribute, number of major vessels colored by flourosopy.
+	\item Thal, categorical attribute, thallium heart scan.
+	\item AHD, the class label for this assignment, heart disease diagnosis. 
+\end{enumerate}
+\clearpage
 
-aaaaaaaaaaaaaaaaaa
+
+
+
 
 \end{document}
