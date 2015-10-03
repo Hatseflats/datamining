@@ -1,7 +1,10 @@
 \documentclass[a4paper,12pt]{scrartcl}
 \usepackage{graphicx}
 \usepackage[none]{hyphenat}
+\usepackage{tikz}
+\usepackage{amsmath}
 \usepackage{pgfplots}
+
 \def\labelitemi{--}
 
 \pgfplotsset{compat=1.9} 
@@ -12,28 +15,62 @@
 \author{Sebastiaan Jong (5546303) \& Bas Geerts (5568978)}
 \date{}
 \maketitle
-\noindent
+\section{Introduction}
 This report is written for the first assignment of the Data Mining (2015) course at Utrecht University. The goal of this assignment was to write a function in the R programming language that constructs a classification tree on a certain dataset, and to figure out efficient parameters for this tree.
-\\
+\section{Data}
 For this assignment we used the Heart Disease dataset from the University of California, Irvine machine learning repository. The preprocessed version for this assignment contains 297 instances and 14 attributes. A brief description of the used attributes:
-\begin{enumerate} \itemsep0pt
-	\renewcommand\labelitemi{--}
-	\item Age, numeric attribute.
-	\item Sex, categorical attribute.
-	\item ChestPain, categorical attribute.
-	\item RestBP, numeric attribute, resting bloodpressure.
-	\item Chol, numeric attribute, serum cholesterol.
-	\item Fbs, categorical attribute, fasting bloodsugar test result. 
-	\item RestECG, categorical attribute, resting electrocardiographic results.
-	\item MaxHR, numeric attribute, maximum heart rate achieved.
-	\item ExAng, categorical attribute, exercise induced angina. 
-	\item Oldpeak, numeric attribute, exercise induced ST-depression. 
-	\item Slope, categorical attribute, slope of the peak exercise ST segment.
-	\item Ca, numeric attribute, number of major vessels colored by flourosopy.
-	\item Thal, categorical attribute, thallium heart scan.
-	\item AHD, the class label for this assignment, heart disease diagnosis. 
-\end{enumerate}
+    \begin{enumerate} \itemsep0pt
+        \renewcommand\labelitemi{--}
+        \item Age, numeric attribute.
+        \item Sex, categorical attribute.
+        \item ChestPain, categorical attribute.
+        \item RestBP, numeric attribute, resting bloodpressure.
+        \item Chol, numeric attribute, serum cholesterol.
+        \item Fbs, categorical attribute, fasting bloodsugar test result. 
+        \item RestECG, categorical attribute, resting electrocardiographic results.
+        \item MaxHR, numeric attribute, maximum heart rate achieved.
+        \item ExAng, categorical attribute, exercise induced angina. 
+        \item Oldpeak, numeric attribute, exercise induced ST-depression. 
+        \item Slope, categorical attribute, slope of the peak exercise ST segment.
+        \item Ca, numeric attribute, number of major vessels colored by flourosopy.
+        \item Thal, categorical attribute, thallium heart scan.
+        \item AHD, the class label for this assignment, heart disease diagnosis. 
+    \end{enumerate}
 \clearpage
+\section{Experiments}
+The size of the classification tree is controlled by the \textit{nmin} (minimum internal node size) and \textit{minleaf} (minimum leaf size) parameters. Instead of brute forcing all possible values it is better to only try some sensible values and narrow down the optimal settings from there. It is possible to make a few observations regarding sensible parameter values (where \textit{n} is the data set size): 
+    \begin{itemize}
+        \item Both $nmin$ and $minleaf$ should not be larger than $n/2$.
+        \item The $minleaf$ parameter should not be larger than $nmin/2$. 
+    \end{itemize}
+
+    \begin{tikzpicture}
+        \begin{axis}[
+            title={Parameter results},
+            xlabel={nmin},
+            ylabel={errorrate},
+            xmin=0, xmax=100,
+            ymin=0, ymax=0.6,
+            width=1\textwidth,
+            height=0.5\textwidth
+        ]
+         
+        \addplot[color=blue,mark=square,]
+            coordinates {
+                (5.000000,  0.260000)(10.000000,  0.272000)(15.00000,  0.22300)(20.00000,  0.24600)(25.000000,  0.302000)(30.000000,  0.244000)(35.000000,  0.265000)(40.000000,  0.289000)(45.000000,  0.227000)(50.000000, 0.297000)(55.0000000, 0.2770000)(60.0000000, 0.3060000)(65.0000000, 0.2440000)(70.0000000, 0.2670000)(75.000000, 0.245000)(80.0000000, 0.2650000)(85.0000000, 0.2830000)(90.0000000, 0.3810000)(95.00000, 0.49000)(100.0000000,   0.4820000)
+            };
+            \legend{5:1}
+
+        \addplot[color=red,mark=square,]
+            coordinates {
+                (4.000000, 0.265000)(8.000000, 0.262000)(12.000000, 0.234000)(16.000000, 0.259000)(20.000000, 0.261000)(24.00000, 0.26500)(28.000000, 0.257000)(32.000000, 0.291000)(36.00000, 0.27400)(40.00000,0.25200)(44.000000,0.234000)(48.000000,0.258000)(52.000000,0.268000)(56.0000000,0.2500000)(60.0000000,0.2580000)(64.0000000,0.2790000)(68.0000000,0.2870000)(72.0000000,0.2850000)(76.0000000,0.2510000)(80.000000,0.265000)
+            };
+            \legend{4:1}
+
+        \end{axis}
+    \end{tikzpicture}
+
+\section{Results}
 
 
 
