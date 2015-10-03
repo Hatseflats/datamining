@@ -1,11 +1,23 @@
+# Definitions:
+# Tree -  A list containing the rownumbers in the current node, the left tree/leaf, 
+#         the right tree/leaf, the classes of the rows in this node and information about the split made. 
+# Leaf -  A list containing a list of rownumbers and a list of their classes.
+# Split - A list containing the type of the split (NUMERIC/CATEGORICAL), a list with the rownumbers and impurity of the left child, 
+#         a list with the rownumbers and impurity of the right child and information about how the split is made.
 
-# Gini index, two class case.
+# impurity
+# vect - a binary numeric vector.
+# returns: a numeric value indicating the impurity of the given input vector.
+# Calculates the impurity using the Gini-index (binary class case).
 impurity <- function(vect){
   freq <- (sum(vect == 0))/length(vect)
   return (freq * (1-freq))
 }
 
-# Given a vector of integers, returns a list of potential splitpoints.
+# splitpoints
+# vect - a numeric vector.
+# returns: a numeric vector containing possible splitpoints.
+# Calculates all values between two consecutive values in the input list, to be used as splitpoints.
 splitpoints <- function(vect){
   sorted <- sort(unique(vect))
   splitpoints <- (sorted[1:(length(vect)-1)]+sorted[2:length(vect)])/2
@@ -14,11 +26,13 @@ splitpoints <- function(vect){
   return (splitpoints)
 }
 
-# Returns all possible splits (yay bruteforcing).
-# x - input data matrix.
+# allsplits
+# x - input dataframe.
 # y - class label vector.
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
+# returns: a list of lists, containing all possible splits per attribute. 
+# Calculates all possible splits that satisfy the nmin and minleaf constraints.
 allsplits <- function(x, y, nmin, minleaf){
   column.names <- numeric.attributes()
   numeric.splits <- mapply(function(c) columnsplits.numeric(x,y,c), column.names)
@@ -34,16 +48,23 @@ allsplits <- function(x, y, nmin, minleaf){
   return(append(categorical.filtered, numeric.filtered))
 }
 
-# Given a list of splits, filter out the splits that do not adhere to the nmin and minleaf constraints.
+# filtersplits.
 # splits - a list of splits.
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
+# returns: a list of eligible split objects.
+# Given a list of splits, filter out the splits that do not adhere to the nmin and minleaf constraints.
 filtersplits <- function(splits, nmin, minleaf){
   eligible <- Filter(function(s) checksplit(s, nmin, minleaf), splits)
   return (eligible)
 }
 
-# Filtersplits helper function.
+# checksplit.
+# split - a split object.
+# nmin - minimum number of observations in a node.
+# minleaf - minimum number of observations in a leaf.
+# returns: a boolean value indicating that this split is usable. 
+# Checks if a split adhere to the nmin and minleaf constraints and that it is usable.
 checksplit <- function(split, nmin, minleaf){
   left.i <- split[[2]][[1]] # impurity is stored in the first position
   left.size <- length(split[[2]][[2]])  # left part of the split
@@ -65,21 +86,25 @@ checksplit <- function(split, nmin, minleaf){
   return (validate(left.i, left.size) & validate(right.i, right.size))
 }
 
-# Returns a list of all possible splits on one column with their scores.
+# columnsplits.numeric
 # x - input dataframe.
 # y - classes vector.
 # c - column index.
+# returns: a list of all splits on one numeric column.
+# Calculates all splits on a numeric column.
 columnsplits.numeric <- function(x, y, c){
   potentialsplits <- splitpoints(x[,c])
   splits <- lapply(potentialsplits, function(pivot) split.numeric(x, y, c, pivot))
   return(splits)
 }
 
-# Split the dataset into two parts and return the impurity for this split.
+# split.numeric
 # x - input dataframe.
 # y - classes vector.
 # c - column index.
 # pivot - value to split on.
+# returns: a split object.
+# Splits the input in two at a certain point and calculates the impurity, only works on numeric attributes.
 split.numeric <- function(x, y, c, pivot){
   ordering <- order(x[,c])
   x.ordered <- x[ordering,]
@@ -101,12 +126,19 @@ split.numeric <- function(x, y, c, pivot){
   return(list("NUMERIC", list(i.left, x.left), list(i.right, x.right), c, pivot))
 }
 
-# Given a list of splits, returns the best one.
+# bestsplit
+# splits - a list of split objects.
+# returns: the split object with the lowest impurity
+# Finds the optimal split from a list of splits.
 bestsplit <- function(splits){
   return (Reduce(minsplit, splits, splits[[1]]))
 }
 
-# Given two splits, returns the split with the lowest impurity.
+# minsplit
+# s1 - a split object.
+# s2 - a split object.
+# returns: a split object with the lowest impurity.
+# Compares two split objects to find the one with the lowest impurity, used to determine the optimal split.
 minsplit <- function(s1, s2){
   score1 <- s1[[2]][[1]] + s1[[3]][[1]]
   score2 <- s2[[2]][[1]] + s2[[3]][[1]]
@@ -117,11 +149,13 @@ minsplit <- function(s1, s2){
     return(s2)
   }
 }
-# Grow a tree.
-# x - input data matrix.
+# tree.grow
+# x - input dataframe.
 # y - class label vector.
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
+# returns: a tree object.
+# Grows a classification tree on the dataset.
 tree.grow <- function(x, y, nmin, minleaf){
 
   possiblesplits <- allsplits(x, y, nmin, minleaf)
@@ -168,20 +202,23 @@ tree.grow <- function(x, y, nmin, minleaf){
   return(node)
 }
 
-# Predict the classes of x.
-# x - input data matrix
+# tree.classify
+# x - input dataframe
 # tr - a tree object
+# returns: a vector of classes.
+# Tries to guess the classes of all rows in the input dataframe. 
 tree.classify <- function(x, tr){
-  
   classify <- function(row, tree){
     leaf <- findleaf(row,tree)
     return(majorityclass(leaf))
   }
-  
   return(apply(x, 1, function(x_) classify(x_, tr)))
 }
 
-# Given a label of class vectors, returns the majority class
+# majorityclass
+# y - class label vector.
+# returns: a binary number.
+# Calculates the majority class of the given class vector.
 majorityclass <- function(y){
  count.1 <- sum(y == 1)
  count.0 <- sum(y == 0)
@@ -193,9 +230,11 @@ majorityclass <- function(y){
   }
 }
 
-# Finds the leaf that x should belong to
+# findleaf
 # x - input row.
 # tr - a tree object.
+# returns: a leaf object.
+# Traverses the tree, using the attributes from the input row until a leaf is found. 
 findleaf <- function(x, tr){
   if(isleaf(tr)){ # leaves only have a list of rownumbers and their classes
     return(tr[[2]])
@@ -229,7 +268,10 @@ findleaf <- function(x, tr){
   }
 }
 
-# tr - a tree object
+# tree.simplify
+# tr - a tree object.
+# returns: a tree object.
+# Tries to simplify the tree by removing sibling leafs if their majority classes are equal. 
 tree.simplify <- function(tr){
   if(isleaf(tr)){
     return(tr)
@@ -250,6 +292,10 @@ tree.simplify <- function(tr){
   }
 }
 
+# isleaf
+# tr - A tree/leaf object.
+# returns: a boolean.
+# Checks if the input is a leaf or an internal node.  
 isleaf <- function(tr){
   if(length(tr) == 2){
     return(TRUE)
@@ -258,6 +304,11 @@ isleaf <- function(tr){
   }
 }
 
+# counterrors
+# classes - class label vector.
+# predictions - class label vector.
+# returns: amount of errors made. 
+# Compares predictions with the actual class labels and counts the amount of errors made.
 counterrors <- function(classes, predictions){
   results <- data.frame(class=classes,prediction=predictions)
   wrong <- 0
@@ -272,6 +323,11 @@ counterrors <- function(classes, predictions){
   return(wrong)
 }
 
+# getfolds
+# data - input dataframe.
+# n - size of a fold.
+# returns: a list of folds. 
+# Takes random folds of size n from the input data, until the input is empty and returns all folds afterwards.
 getfolds <- function(data, n){
   
   folds <- list()
@@ -286,6 +342,13 @@ getfolds <- function(data, n){
   return(folds)
 }
 
+# crossvalidation
+# x - input dataframe.
+# y - class label vector.
+# nmin - minimum number of observations in a node.
+# minleaf - minimum number of observations in a leaf.
+# returns: a list of vectors with the errorrate, the amount of internal nodes and the amount of leaves per fold.
+# Performs 10 fold crossvalidation. 
 crossvalidation <- function(x, y, nmin, minleaf){
   trainingset <- x[sample(nrow(x), 200),]
   trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
@@ -319,12 +382,22 @@ crossvalidation <- function(x, y, nmin, minleaf){
   return(result)
 }
 
-# returns true if any of the columns in 'columns' is 1 for the given row. 
+# categorical.subset
+# row - a row from a dataframe.
+# columns - A subset of columns of a categorical attribute.
+# returns: a boolean value.
+# Checks if the given row has any of the category labels from the given attribute.
 categorical.subset <- function(row, columns){
   s <- sapply(columns, function(c) row[c] == 1)
   return(any(s))
 }
 
+# split.categorical
+# x - input dataframe.
+# y - classes vector.
+# s - vector of possible categories for a categorical attribute.
+# returns: a split object.
+# Splits the input in two at a certain point and calculates the impurity, only works on categorical attributes.
 split.categorical <- function(x, y, s){
   rows <- apply(x, 1, function(row) categorical.subset(row, s))
   
@@ -342,7 +415,12 @@ split.categorical <- function(x, y, s){
   return(list("CATEGORICAL", list(i.left, x.left), list(i.right, x.right), s))
 }
 
-
+# categorical.splitpoints
+# data <- A subset of the original data, containing only the columns for one categorical attribute.
+# classes <- class vector.
+# returns: a list of possible splits to be made on a categorical attribute. 
+# Calculates all possible splitpoints on a categorical attributes. 
+# Uses the method shown in class so that we only have to check L-1 splits.
 categorical.splitpoints <- function(data, classes){
   
   calcprob <- function(col, classes){
@@ -365,31 +443,41 @@ categorical.splitpoints <- function(data, classes){
   return(cat.splits)
 }
 
+# numeric.attributes
+# returns: list of numeric attributes in the heartdisease dataset.
+# Hardcoded list to make life easier. 
 numeric.attributes <- function(){
   return(list("Age","Sex","RestBP","Chol","Fbs","RestECG","MaxHR","ExAng","Oldpeak","Slope","Ca"))
 }
 
+# categorical.attributes
+# returns: list of categorical attributes in the heartdisease dataset.
+# Hardcoded list to make life easier. 
 categorical.attributes <- function(){
   cat1 <- c("ChestPain.asymptomatic","ChestPain.nonanginal","ChestPain.nontypical","ChestPain.typical")
   cat2 <- c("Thal.fixed","Thal.normal","Thal.reversable")
   
   return(list(cat1, cat2))
 }
-# Returns the amount of internal nodes and leaves in a tree.
-# Tree - a tree object.
+
+# tree.size
+# tree - a tree object.
+# returns: a numeric vector with the amount of internal nodes and the amount of leaves.
+# Calculates the size of a tree.
 tree.size <- function(tree){
   if(isleaf(tree)){
     return (c(0,1))
   } 
-  
-  left.size <- tree.size(tree[[2]])
-  right.size <- tree.size(tree[[3]])
-  
-  result <- c(1,0) + left.size + right.size
-  
+
+  result <- c(1,0) + tree.size(tree[[2]]) + tree.size(tree[[3]])
   return(result)
 }
 
+# parameterexperiment
+# data - input data.
+# classes - class label vector.
+# returns: a list of numeric vectors with nmin, minleaf, errorrate, number of leaves, number of nodes and tree construction time. 
+# Used to test several nmin and minleaf parameters.
 parameterexperiment <- function(data, classes){
   
   runcrossval <- function(data, classes, runs, nmin, minleaf){
@@ -419,12 +507,24 @@ parameterexperiment <- function(data, classes){
     
     return(c(avgerrors, avgsize, avgtime))
   }
-  result <- runcrossval(data,classes,1,50,10)
   
-  return(result)
+  results <- list()
+  nmin <- 0
+  minleaf <- 0
+  
+  for(i in 1:20){
+    nmin <- nmin + 4
+    minleaf <- minleaf + 1
+    
+    result <- c(nmin, minleaf, runcrossval(data,classes,5,nmin,minleaf))
+    results[[length(results)+1]] <- result
+    
+  }
+  
+  return(results)
 }
 
-
+# main function
 main <- function(){
   data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
   classes <- data[,length(data)]
@@ -432,33 +532,8 @@ main <- function(){
 
   
   a <- parameterexperiment(data, classes)
-  print(a)
-#   trainingset <- data[sample(nrow(data), 10),]
-#   trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
-#   trainingset.indices <- which(rownames(data) %in% rownames(trainingset))
-#   trainingset.classes <- classes[trainingset.indices]
-#   
-#   print(rownames(trainingset))
-#   
-#   print(trainingset[,"AHD"][1:10])
-#   print(trainingset.classes[1:10])
-#   
-#   folds <- getfolds(trainingset,20)
-#   
-#   fold <- folds[[1]]
   
-  # print(fold[,"AHD"])
-#   
-#   fold.indices <- which(rownames(trainingset) %in% rownames(fold))
-#   fold.classes <- trainingset.classes[fold.indices]
-#   
-  # print(fold.classes)
+  print(a)
 
-  # tree <- tree.grow(data,classes,2,1)
-#   predictions <- tree.classify(data,tree)
-#   print(counterrors(classes, predictions))
-
-    
 }  
 main()
-
