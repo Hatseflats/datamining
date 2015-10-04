@@ -276,7 +276,7 @@ tree.simplify <- function(tr){
   if(isleaf(tr)){
     return(tr)
   }
-  
+
   leftchild <- tr[[2]]
   rightchild <- tr[[3]]
   
@@ -285,10 +285,13 @@ tree.simplify <- function(tr){
     rightmajority <- majorityclass(rightchild[[2]])
     
     if(leftmajority == rightmajority){
-      return(list(tr[[1]], tr[[6]]))
+      leaf <- list(tr[[1]], tr[[4]])
+      return(leaf)
+    } else {
+      return(list(tr[[1]], leftchild, rightchild, tr[[4]], tr[[5]]))
     }
   } else {
-    return(list(tr[[1]], tree.simplify(tr[[2]]), tree.simplify(tr[[3]]), tr[[4]], tr[[5]], tr[[6]]))
+    return(list(tr[[1]], tree.simplify(tr[[2]]), tree.simplify(tr[[3]]), tr[[4]], tr[[5]]))
   }
 }
 
@@ -509,16 +512,37 @@ parameterexperiment <- function(data, classes){
   }
   
   results <- list()
+  currentmin <- 1
+  
   nmin <- 0
   minleaf <- 0
   
-  for(i in 1:25){
-    nmin <- nmin + 4
-    minleaf <- minleaf + 1
-    
-    result <- c(nmin, minleaf, runcrossval(data,classes,5,nmin,minleaf))
-    results[[length(results)+1]] <- result
-    
+#   for(i in 1:20){
+#     nmin <- nmin + 5
+#     minleaf <- minleaf + 1
+#     
+#     runs <- 3
+#     if (nmin >= 80){
+#       runs <- 1
+#     }
+#     
+#     result <- c(nmin, minleaf, runcrossval(data,classes,runs,nmin,minleaf))
+#     print(result)
+#     results[[length(results)+1]] <- result
+#   }
+
+
+  for(i in seq(20,10,by=-1)){
+    for(j in seq(floor(i/2),1,by=-1)){
+      result <- c(i, j, runcrossval(data,classes,2,i,j))
+      
+      error <- result[3]
+      if(error < currentmin){
+        currentmin <- error
+      }
+      print(result)
+      results[[length(results)+1]] <- result
+    }
   }
   
   return(results)
@@ -528,13 +552,102 @@ parameterexperiment <- function(data, classes){
 main <- function(){
   data <- read.csv('~/UU/MDM/datamining/assignment1/data/heartbin.txt')
   
-    classes <- data[,length(data)]
-  data <- data[,1:(length(data)-1)]
+  y <- data[,length(data)]
+  x <- data[,1:(length(data)-1)]
+  
+  testsample.indices <- c(2,8,26,27,29,32,33,35,36,37,41,44,45,46,47,59,62,66,67,69,72,73,74,82,88,91,92,93,94,95,97,100,101,103,104,107,110,114,116,122,127,130,133,138,42,146,147,151,152,158,160,161,163,165,168,169,170,173,179,180,184,186,194,195,200,204,205,208,211,212,213,214,217,220,225,228,234,237,239,241,244,250,251,254,260,265,270,271,274,278,280,284,286,288,290,292,297)
+  testsample <- x[(testsample.indices),]
+  testsample.classes <- y[(testsample.indices)]
 
+  trainingset <- x[-(testsample.indices),]
+  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
+  trainingset.classes <- y[trainingset.indices]
   
-  a <- parameterexperiment(data, classes)
+  tree <- tree.grow(trainingset, trainingset.classes, 16,8)
+  tree <- tree.simplify(tree)
   
+  predictions <- tree.classify(testsample, tree)
+  
+  errors <- counterrors(testsample.classes, predictions)
+  
+  size <- tree.size(tree)
+  errorrate <- errors/nrow(testsample)
+  
+  a <- c(16,8,errorrate,size)
   print(a)
+  
+  tree <- tree.simplify(tree)
+  
+
+
+  # print(tree)
+#   
+#   a <- parameterexperiment(data, classes)
+#   lapply(a, write, "stuff.txt", append=TRUE, ncolumns=1000)
+#   
+  # print(a)
+  
+  # wtf(x,y)
+
 
 }  
+
+
+
+tree.print <- function(tr){
+  if(isleaf(tr)){
+  
+  } else {
+    str <- tr[[5]][[2]]
+    
+    tree.print(tr[[2]])
+    tree.print(tr[[3]])
+  }
+}
+
+wtf <- function(x,y){
+  #   for(i in seq(20,10,by=-2)){
+  #     for(j in seq(floor(i/2),1,by=-2)){
+  #       result <- c(0,0,0,0,0)
+  #       
+  #       for(z in 1:1){
+  trainingset <- x[sample(nrow(x), 200),]
+  trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
+  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
+  trainingset.classes <- y[trainingset.indices]
+  
+  testsample <- x[-(trainingset.indices),]
+  testsample.classes <- y[-(trainingset.indices)]
+  testsample.indices <- which(rownames(x) %in% rownames(testsample))
+  
+  tree <- tree.grow(trainingset,trainingset.classes,16,8)
+  predictions <- tree.classify(testsample, tree)
+  
+  errors <- counterrors(testsample.classes, predictions)
+  
+  size <- tree.size(tree)
+  errorrate <- errors/nrow(testsample)
+  
+  a <- c(16,8,errorrate,size)
+  # print(tree)
+  print(tree[[2]][[2]])
+  tree <- tree.simplify(tree)
+  # print(tree)
+  # print("_-------------------------------------------______--------------------___---------------___-----____----__---")
+#   print(tree)
+#   tree.print(tree)
+
+  
+  # tree.print(tree)
+  # print(tree)
+  # print(testsample.indices)
+  
+#       }
+#       
+#       print(result/5)
+#       }
+#     }
+}
+
 main()
+
