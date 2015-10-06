@@ -346,19 +346,15 @@ getfolds <- function(data, n){
 }
 
 # crossvalidation
-# x - input dataframe.
-# y - class label vector.
+# trainingset - The training data.
+# trainingset.classes -trainingset classes.
+# testsample - The testsample.
+# testsample.classes - Classes of the testsample.
 # nmin - minimum number of observations in a node.
 # minleaf - minimum number of observations in a leaf.
 # returns: a list of vectors with the errorrate, the amount of internal nodes and the amount of leaves per fold.
 # Performs 10 fold crossvalidation. 
-crossvalidation <- function(x, y, nmin, minleaf){
-  trainingset <- x[sample(nrow(x), 200),]
-  trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
-  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
-  trainingset.classes <- y[trainingset.indices]
-  
-  testsample <- x[-(trainingset.indices),]
+crossvalidation <- function(trainingset, trainingset.classes, testsample, testsample.classes, nmin, minleaf){
   
   folds <- getfolds(trainingset, 20)
   
@@ -477,13 +473,21 @@ tree.size <- function(tree){
 }
 
 # parameterexperiment
-# data - input data.
-# classes - class label vector.
+# x - input data.
+# y - class label vector.
 # returns: a list of numeric vectors with nmin, minleaf, errorrate, number of leaves, number of nodes and tree construction time. 
 # Used to test several nmin and minleaf parameters.
-parameterexperiment <- function(data, classes){
+parameterexperiment <- function(x, y){
   
-  runcrossval <- function(data, classes, runs, nmin, minleaf){
+  trainingset <- x[sample(nrow(x), 200),]
+  trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
+  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
+  trainingset.classes <- y[trainingset.indices]
+  
+  testsample <- x[-(trainingset.indices),]
+  
+
+  runcrossval <- function(trainingset, trainingset.classes, testsample, testsample.classes, runs, nmin, minleaf){
     totalerrors <- 0
     totalsize <- c(0,0)
     totaltime <- 0
@@ -491,7 +495,7 @@ parameterexperiment <- function(data, classes){
     for (i in 1:runs){
       start.time <- Sys.time()
     
-      results <- crossvalidation(data, classes, nmin, minleaf)
+      results <- crossvalidation(trainingset, trainingset.classes, testsample, testsample.classes, nmin, minleaf)
       
       end.time <- Sys.time()
       time.taken <- end.time - start.time
@@ -512,38 +516,92 @@ parameterexperiment <- function(data, classes){
   }
   
   results <- list()
+  results[[length(results)+1]] <- rownames(testsample)
+  
   currentmin <- 1
   
   nmin <- 0
   minleaf <- 0
   
-#   for(i in 1:20){
-#     nmin <- nmin + 5
-#     minleaf <- minleaf + 1
-#     
-#     runs <- 3
-#     if (nmin >= 80){
-#       runs <- 1
-#     }
-#     
-#     result <- c(nmin, minleaf, runcrossval(data,classes,runs,nmin,minleaf))
-#     print(result)
-#     results[[length(results)+1]] <- result
-#   }
-
-
-  for(i in seq(20,10,by=-1)){
-    for(j in seq(floor(i/2),1,by=-1)){
-      result <- c(i, j, runcrossval(data,classes,2,i,j))
-      
-      error <- result[3]
-      if(error < currentmin){
-        currentmin <- error
-      }
-      print(result)
-      results[[length(results)+1]] <- result
+  for(i in 1:20){
+    nmin <- nmin + 5
+    minleaf <- minleaf + 1
+    
+    runs <- 3
+    if (nmin >= 80){
+      runs <- 1
     }
+    
+    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
+    print(result)
+    results[[length(results)+1]] <- result
   }
+  
+  nmin <- 0
+  minleaf <- 0
+  
+  for(i in 1:25){
+    nmin <- nmin + 4
+    minleaf <- minleaf + 1
+    
+    runs <- 3
+    if (nmin >= 80){
+      runs <- 1
+    }
+    
+    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
+    print(result)
+    results[[length(results)+1]] <- result
+  }
+  
+  nmin <- 0
+  minleaf <- 0
+  
+  for(i in 1:33){
+    nmin <- nmin + 3
+    minleaf <- minleaf + 1
+    
+    runs <- 3
+    if (nmin >= 80){
+      runs <- 1
+    }
+    
+    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
+    print(result)
+    results[[length(results)+1]] <- result
+  }
+  
+  nmin <- 0
+  minleaf <- 0
+  
+  for(i in 1:25){
+    nmin <- nmin + 4
+    minleaf <- minleaf + 2
+    
+    runs <- 3
+    if (nmin >= 80){
+      runs <- 1
+    }
+    
+    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
+    print(result)
+    results[[length(results)+1]] <- result
+  }
+  
+
+
+#   for(i in seq(20,10,by=-1)){
+#     for(j in seq(floor(i/2),1,by=-1)){
+#       result <- c(i, j, runcrossval(x,y,2,i,j))
+#       
+#       error <- result[3]
+#       if(error < currentmin){
+#         currentmin <- error
+#       }
+#       print(result)
+#       results[[length(results)+1]] <- result
+#     }
+#   }
   
   return(results)
 }
@@ -554,41 +612,14 @@ main <- function(){
   
   y <- data[,length(data)]
   x <- data[,1:(length(data)-1)]
+  wtf2(x,y)
   
-  testsample.indices <- c(2,8,26,27,29,32,33,35,36,37,41,44,45,46,47,59,62,66,67,69,72,73,74,82,88,91,92,93,94,95,97,100,101,103,104,107,110,114,116,122,127,130,133,138,42,146,147,151,152,158,160,161,163,165,168,169,170,173,179,180,184,186,194,195,200,204,205,208,211,212,213,214,217,220,225,228,234,237,239,241,244,250,251,254,260,265,270,271,274,278,280,284,286,288,290,292,297)
-  testsample <- x[(testsample.indices),]
-  testsample.classes <- y[(testsample.indices)]
-
-  trainingset <- x[-(testsample.indices),]
-  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
-  trainingset.classes <- y[trainingset.indices]
-  
-  tree <- tree.grow(trainingset, trainingset.classes, 16,8)
-  tree <- tree.simplify(tree)
-  
-  predictions <- tree.classify(testsample, tree)
-  
-  errors <- counterrors(testsample.classes, predictions)
-  
-  size <- tree.size(tree)
-  errorrate <- errors/nrow(testsample)
-  
-  a <- c(16,8,errorrate,size)
-  print(a)
-  
-  tree <- tree.simplify(tree)
-  
-
-
-  # print(tree)
+#   a <- parameterexperiment(x,y)
 #   
-#   a <- parameterexperiment(data, classes)
 #   lapply(a, write, "stuff.txt", append=TRUE, ncolumns=1000)
 #   
-  # print(a)
+#   print(a)
   
-  # wtf(x,y)
-
 
 }  
 
@@ -599,54 +630,61 @@ tree.print <- function(tr){
   
   } else {
     str <- tr[[5]][[2]]
+    print(str)
     
     tree.print(tr[[2]])
     tree.print(tr[[3]])
   }
 }
 
-wtf <- function(x,y){
-  #   for(i in seq(20,10,by=-2)){
-  #     for(j in seq(floor(i/2),1,by=-2)){
-  #       result <- c(0,0,0,0,0)
-  #       
-  #       for(z in 1:1){
-  trainingset <- x[sample(nrow(x), 200),]
-  trainingset <- trainingset[order(as.numeric(rownames(trainingset))),]
-  trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
-  trainingset.classes <- y[trainingset.indices]
+runcrossval <- function(trainingset, trainingset.classes, testsample, testsample.classes, runs, nmin, minleaf){
+  totalerrors <- 0
+  totalsize <- c(0,0)
+  totaltime <- 0
   
-  testsample <- x[-(trainingset.indices),]
-  testsample.classes <- y[-(trainingset.indices)]
-  testsample.indices <- which(rownames(x) %in% rownames(testsample))
+  for (i in 1:runs){
+    start.time <- Sys.time()
+    
+    results <- crossvalidation(trainingset, trainingset.classes, testsample, testsample.classes, nmin, minleaf)
+    
+    end.time <- Sys.time()
+    time.taken <- end.time - start.time
+    totaltime <- totaltime + time.taken
+    
+    for(i in 1:length(results)){
+      row <- results[[i]]
+      totalerrors <- totalerrors + row[[1]]
+      totalsize <- totalsize + row[[2]]
+    }
+  }
   
-  tree <- tree.grow(trainingset,trainingset.classes,16,8)
-  predictions <- tree.classify(testsample, tree)
+  avgerrors <- totalerrors/(10*runs)
+  avgsize <- totalsize/(10*runs)
+  avgtime <- totaltime/(10*runs)
   
-  errors <- counterrors(testsample.classes, predictions)
-  
-  size <- tree.size(tree)
-  errorrate <- errors/nrow(testsample)
-  
-  a <- c(16,8,errorrate,size)
-  # print(tree)
-  print(tree[[2]][[2]])
-  tree <- tree.simplify(tree)
-  # print(tree)
-  # print("_-------------------------------------------______--------------------___---------------___-----____----__---")
-#   print(tree)
-#   tree.print(tree)
+  return(c(avgerrors, avgsize, avgtime))
+}
 
-  
-  # tree.print(tree)
-  # print(tree)
-  # print(testsample.indices)
-  
-#       }
-#       
-#       print(result/5)
-#       }
-#     }
+wtf2 <- function(x,y){
+    testsample.indices <- c(5,8,9,11,14,18,19,20,22,23,27,30,33,35,39,41,43,44,46,53,54,55,57,59,62,63,64,65,67,69,70,72,73,74,75,76,82,83,88,89,90,91,96,99,102,103,106,111,121,122,124,125,131,136,141,145,152,154,158,164,171,172,177,179,183,190,191,193,198,199,205,208,217,221,225,226,228,229,230,234,238,239,240,247,248,250,254,257,258,259,281,285,286,290,293,294,297)
+    testsample <- x[(testsample.indices),]
+    testsample.classes <- y[(testsample.indices)]
+    
+    trainingset <- x[-(testsample.indices),]
+    trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
+    trainingset.classes <- y[trainingset.indices]
+    
+    results <- list()
+    for(i in seq(20,10,by=-1)){
+      for(j in seq(ceiling(i/2),1,by=-1)){
+        a <- c(i, j, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,1,i,j))
+        print(a)
+        results[[length(results)+1]] <- a
+      }
+    }
+    
+
+    print(results)
 }
 
 main()
