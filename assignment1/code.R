@@ -5,6 +5,130 @@
 # Split - A list containing the type of the split (NUMERIC/CATEGORICAL), a list with the rownumbers and impurity of the left child, 
 #         a list with the rownumbers and impurity of the right child and information about how the split is made.
 
+# tree.grow
+# x - input dataframe.
+# y - class label vector.
+# nmin - minimum number of observations in a node.
+# minleaf - minimum number of observations in a leaf.
+# returns: a tree object.
+# Grows a classification tree on the dataset.
+tree.grow <- function(x, y, nmin, minleaf){
+  
+  possiblesplits <- allsplits(x, y, nmin, minleaf)
+  possiblesplits <- Filter(function(column) length(column) > 0, possiblesplits)
+  
+  if(length(possiblesplits) == 0){
+    return(list(rownames(x), y))
+  }
+  
+  columns.optimal <- lapply(possiblesplits, bestsplit)
+  optimal <- bestsplit(columns.optimal)
+  
+  left.i <- optimal[[2]][[1]]
+  left.rownames <- optimal[[2]][[2]]
+  left.classes <- y[which(rownames(x) %in% left.rownames)]
+  left.rows <- x[left.rownames,]
+  
+  right.i <- optimal[[3]][[1]]
+  right.rownames <- optimal[[3]][[2]]
+  right.classes <- y[which(rownames(x) %in% right.rownames)]
+  right.rows <- x[right.rownames,]
+  
+  split.info <- list
+  
+  if(optimal[[1]] == "NUMERIC"){
+    split.info <- list("NUMERIC", optimal[[4]], optimal[[5]])
+  } else {
+    split.info <- list("CATEGORICAL", optimal[[4]])
+  }
+  
+  if(left.i > 0){
+    left.result <- tree.grow(left.rows, left.classes, nmin, minleaf)
+  } else {
+    left.result <- list(left.rownames, left.classes)
+  }
+  
+  if(right.i > 0){
+    right.result <- tree.grow(right.rows, right.classes, nmin, minleaf)
+  } else {
+    right.result <- list(right.rownames, right.classes)
+  }
+  
+  node <- list(rownames(x), left.result, right.result, y, split.info)
+  return(node)
+}
+
+# tree.classify
+# x - input dataframe
+# tr - a tree object
+# returns: a vector of classes.
+# Tries to guess the classes of all rows in the input dataframe. 
+tree.classify <- function(x, tr){
+  classify <- function(row, tree){
+    leaf <- findleaf(row,tree)
+    return(majorityclass(leaf))
+  }
+  return(apply(x, 1, function(x_) classify(x_, tr)))
+}
+
+# tree.simplify
+# tr - a tree object.
+# returns: a tree object.
+# Tries to simplify the tree by removing sibling leafs if their majority classes are equal. 
+tree.simplify <- function(tr){
+  if(isleaf(tr)){
+    return(tr)
+  }
+  
+  leftchild <- tr[[2]]
+  rightchild <- tr[[3]]
+  
+  if(isleaf(leftchild) & isleaf(rightchild)){
+    leftmajority <- majorityclass(leftchild[[2]])
+    rightmajority <- majorityclass(rightchild[[2]])
+    
+    if(leftmajority == rightmajority){
+      leaf <- list(tr[[1]], tr[[4]])
+      return(leaf)
+    } else {
+      return(list(tr[[1]], tree.simplify(leftchild), tree.simplify(rightchild), tr[[4]], tr[[5]]))
+    }
+  } else {
+    return(list(tr[[1]], tree.simplify(tr[[2]]), tree.simplify(tr[[3]]), tr[[4]], tr[[5]]))
+  }
+}
+
+# tree.print
+# tr - a tree object
+# whitespace - whitespace to put in front of prints
+# Pretty prints a tree. 
+tree.print = function(tr, whitespace = 0) {
+  spaces = sprintf(paste0("%", whitespace, "s"), "")
+  if(!isleaf(tr)) {
+    str <- ""
+    splitinfo <- tr[[5]]
+    
+    zerocount <- sum(tr[[4]] == 0)
+    onecount <- sum(tr[[4]] == 1)
+    
+    if(splitinfo[[1]] == "NUMERIC"){
+      str <- sprintf("(%s,%s) - %s %s", zerocount, onecount, splitinfo[[2]], splitinfo[[3]])
+    } else {
+      str <- sprintf("(%s,%s) - %s", zerocount, onecount, toString(splitinfo[[2]]))
+    }
+    
+    cat(spaces, str, "\n")
+    
+    tree.print(tr[[2]], whitespace + 3)
+    tree.print(tr[[3]], whitespace + 3)
+  } else {
+    zerocount <- sum(tr[[2]] == 0)
+    onecount <- sum(tr[[2]] == 1)
+    
+    cat(spaces, sprintf("(%s,%s)", zerocount, onecount), "\n")
+  }
+}
+
 # impurity
 # vect - a binary numeric vector.
 # returns: a numeric value indicating the impurity of the given input vector.
@@ -126,6 +250,67 @@ split.numeric <- function(x, y, c, pivot){
   return(list("NUMERIC", list(i.left, x.left), list(i.right, x.right), c, pivot))
 }
 
+# categorical.subset
+# row - a row from a dataframe.
+# columns - A subset of columns of a categorical attribute.
+# returns: a boolean value.
+# Checks if the given row has any of the category labels from the given attribute.
+categorical.subset <- function(row, columns){
+  s <- sapply(columns, function(c) row[c] == 1)
+  return(any(s))
+}
+
+# split.categorical
+# x - input dataframe.
+# y - classes vector.
+# s - vector of possible categories for a categorical attribute.
+# returns: a split object.
+# Splits the input in two at a certain point and calculates the impurity, only works on categorical attributes.
+split.categorical <- function(x, y, s){
+  rows <- apply(x, 1, function(row) categorical.subset(row, s))
+  
+  x.left <- rownames(x[rows,])
+  x.right <- rownames(x[!rows,])
+  
+  y.left <- y[which(rownames(x) %in% x.left)]
+  y.right <- y[which(rownames(x) %in% x.right)]
+  
+  y.length <- length(y)
+  
+  i.left = impurity(y.left)*(length(y.left)/y.length)
+  i.right = impurity(y.right)*(length(y.right)/y.length)
+  
+  return(list("CATEGORICAL", list(i.left, x.left), list(i.right, x.right), s))
+}
+
+# categorical.splitpoints
+# data <- A subset of the original data, containing only the columns for one categorical attribute.
+# classes <- class vector.
+# returns: a list of possible splits to be made on a categorical attribute. 
+# Calculates all possible splitpoints on a categorical attributes. 
+# Uses the method shown in class so that we only have to check L-1 splits.
+categorical.splitpoints <- function(data, classes){
+  
+  calcprob <- function(col, classes){
+    m <- matrix(c(col, classes), nrow=length(classes), ncol=2)
+    total <- sum(m[,1] == 1)
+    zeroes <- sum(m[,1] == 1 & m[,2] == 0)
+    
+    return(zeroes/total)
+  }
+  
+  result <- apply(data, 2, function(x) calcprob(x,classes))
+  result <- sort(result)
+  
+  cat.splits <- list()
+  
+  for(i in 1:(length(result)-1)){
+    cat.splits[length(cat.splits)+1] <- list(names(result)[1:i])
+  }
+  
+  return(cat.splits)
+}
+
 # bestsplit
 # splits - a list of split objects.
 # returns: the split object with the lowest impurity
@@ -149,71 +334,7 @@ minsplit <- function(s1, s2){
     return(s2)
   }
 }
-# tree.grow
-# x - input dataframe.
-# y - class label vector.
-# nmin - minimum number of observations in a node.
-# minleaf - minimum number of observations in a leaf.
-# returns: a tree object.
-# Grows a classification tree on the dataset.
-tree.grow <- function(x, y, nmin, minleaf){
 
-  possiblesplits <- allsplits(x, y, nmin, minleaf)
-  possiblesplits <- Filter(function(column) length(column) > 0, possiblesplits)
-  
-  if(length(possiblesplits) == 0){
-    return(list(rownames(x), y))
-  }
-  
-  columns.optimal <- lapply(possiblesplits, bestsplit)
-  optimal <- bestsplit(columns.optimal)
-
-  left.i <- optimal[[2]][[1]]
-  left.rownames <- optimal[[2]][[2]]
-  left.classes <- y[which(rownames(x) %in% left.rownames)]
-  left.rows <- x[left.rownames,]
-  
-  right.i <- optimal[[3]][[1]]
-  right.rownames <- optimal[[3]][[2]]
-  right.classes <- y[which(rownames(x) %in% right.rownames)]
-  right.rows <- x[right.rownames,]
-  
-  split.info <- list
-  
-  if(optimal[[1]] == "NUMERIC"){
-    split.info <- list("NUMERIC", optimal[[4]], optimal[[5]])
-  } else {
-    split.info <- list("CATEGORICAL", optimal[[4]])
-  }
-  
-  if(left.i > 0){
-    left.result <- tree.grow(left.rows, left.classes, nmin, minleaf)
-  } else {
-    left.result <- list(left.rownames, left.classes)
-  }
-  
-  if(right.i > 0){
-    right.result <- tree.grow(right.rows, right.classes, nmin, minleaf)
-  } else {
-    right.result <- list(right.rownames, right.classes)
-  }
-  
-  node <- list(rownames(x), left.result, right.result, y, split.info)
-  return(node)
-}
-
-# tree.classify
-# x - input dataframe
-# tr - a tree object
-# returns: a vector of classes.
-# Tries to guess the classes of all rows in the input dataframe. 
-tree.classify <- function(x, tr){
-  classify <- function(row, tree){
-    leaf <- findleaf(row,tree)
-    return(majorityclass(leaf))
-  }
-  return(apply(x, 1, function(x_) classify(x_, tr)))
-}
 
 # majorityclass
 # y - class label vector.
@@ -268,43 +389,12 @@ findleaf <- function(x, tr){
   }
 }
 
-# tree.simplify
-# tr - a tree object.
-# returns: a tree object.
-# Tries to simplify the tree by removing sibling leafs if their majority classes are equal. 
-tree.simplify <- function(tr){
-  if(isleaf(tr)){
-    return(tr)
-  }
-
-  leftchild <- tr[[2]]
-  rightchild <- tr[[3]]
-  
-  if(isleaf(leftchild) & isleaf(rightchild)){
-    leftmajority <- majorityclass(leftchild[[2]])
-    rightmajority <- majorityclass(rightchild[[2]])
-    
-    if(leftmajority == rightmajority){
-      leaf <- list(tr[[1]], tr[[4]])
-      return(leaf)
-    } else {
-      return(list(tr[[1]], leftchild, rightchild, tr[[4]], tr[[5]]))
-    }
-  } else {
-    return(list(tr[[1]], tree.simplify(tr[[2]]), tree.simplify(tr[[3]]), tr[[4]], tr[[5]]))
-  }
-}
-
 # isleaf
 # tr - A tree/leaf object.
 # returns: a boolean.
 # Checks if the input is a leaf or an internal node.  
 isleaf <- function(tr){
-  if(length(tr) == 2){
-    return(TRUE)
-  } else {
-    return(FALSE)
-  }
+    return(length(tr) == 2)
 }
 
 # counterrors
@@ -379,67 +469,6 @@ crossvalidation <- function(trainingset, trainingset.classes, testsample, testsa
   result <- lapply(folds, function(f) foldtree(f, trainingset, trainingset.classes, nmin, minleaf))
   
   return(result)
-}
-
-# categorical.subset
-# row - a row from a dataframe.
-# columns - A subset of columns of a categorical attribute.
-# returns: a boolean value.
-# Checks if the given row has any of the category labels from the given attribute.
-categorical.subset <- function(row, columns){
-  s <- sapply(columns, function(c) row[c] == 1)
-  return(any(s))
-}
-
-# split.categorical
-# x - input dataframe.
-# y - classes vector.
-# s - vector of possible categories for a categorical attribute.
-# returns: a split object.
-# Splits the input in two at a certain point and calculates the impurity, only works on categorical attributes.
-split.categorical <- function(x, y, s){
-  rows <- apply(x, 1, function(row) categorical.subset(row, s))
-  
-  x.left <- rownames(x[rows,])
-  x.right <- rownames(x[!rows,])
-  
-  y.left <- y[which(rownames(x) %in% x.left)]
-  y.right <- y[which(rownames(x) %in% x.right)]
-  
-  y.length <- length(y)
-  
-  i.left = impurity(y.left)*(length(y.left)/y.length)
-  i.right = impurity(y.right)*(length(y.right)/y.length)
-  
-  return(list("CATEGORICAL", list(i.left, x.left), list(i.right, x.right), s))
-}
-
-# categorical.splitpoints
-# data <- A subset of the original data, containing only the columns for one categorical attribute.
-# classes <- class vector.
-# returns: a list of possible splits to be made on a categorical attribute. 
-# Calculates all possible splitpoints on a categorical attributes. 
-# Uses the method shown in class so that we only have to check L-1 splits.
-categorical.splitpoints <- function(data, classes){
-  
-  calcprob <- function(col, classes){
-    m <- matrix(c(col, classes), nrow=length(classes), ncol=2)
-    total <- sum(m[,1] == 1)
-    zeroes <- sum(m[,1] == 1 & m[,2] == 0)
-
-    return(zeroes/total)
-  }
-  
-  result <- apply(data, 2, function(x) calcprob(x,classes))
-  result <- sort(result)
-  
-  cat.splits <- list()
-  
-  for(i in 1:(length(result)-1)){
-    cat.splits[length(cat.splits)+1] <- list(names(result)[1:i])
-  }
-  
-  return(cat.splits)
 }
 
 # numeric.attributes
@@ -537,72 +566,6 @@ parameterexperiment <- function(x, y){
     results[[length(results)+1]] <- result
   }
   
-  nmin <- 0
-  minleaf <- 0
-  
-  for(i in 1:25){
-    nmin <- nmin + 4
-    minleaf <- minleaf + 1
-    
-    runs <- 3
-    if (nmin >= 80){
-      runs <- 1
-    }
-    
-    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
-    print(result)
-    results[[length(results)+1]] <- result
-  }
-  
-  nmin <- 0
-  minleaf <- 0
-  
-  for(i in 1:33){
-    nmin <- nmin + 3
-    minleaf <- minleaf + 1
-    
-    runs <- 3
-    if (nmin >= 80){
-      runs <- 1
-    }
-    
-    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
-    print(result)
-    results[[length(results)+1]] <- result
-  }
-  
-  nmin <- 0
-  minleaf <- 0
-  
-  for(i in 1:25){
-    nmin <- nmin + 4
-    minleaf <- minleaf + 2
-    
-    runs <- 3
-    if (nmin >= 80){
-      runs <- 1
-    }
-    
-    result <- c(nmin, minleaf, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,runs,nmin,minleaf))
-    print(result)
-    results[[length(results)+1]] <- result
-  }
-  
-
-
-#   for(i in seq(20,10,by=-1)){
-#     for(j in seq(floor(i/2),1,by=-1)){
-#       result <- c(i, j, runcrossval(x,y,2,i,j))
-#       
-#       error <- result[3]
-#       if(error < currentmin){
-#         currentmin <- error
-#       }
-#       print(result)
-#       results[[length(results)+1]] <- result
-#     }
-#   }
-  
   return(results)
 }
 
@@ -612,80 +575,19 @@ main <- function(){
   
   y <- data[,length(data)]
   x <- data[,1:(length(data)-1)]
-  wtf2(x,y)
   
-#   a <- parameterexperiment(x,y)
-#   
-#   lapply(a, write, "stuff.txt", append=TRUE, ncolumns=1000)
-#   
-#   print(a)
+  tree <- tree.simplify(tree.grow(x,y,16,8))
   
-
+  print(tree.size(tree))
+  tree.print(tree)
+  
+  
+  
+  testsample.indices <- c(5,8,9,11,14,18,19,20,22,23,27,30,33,35,39,41,43,44,46,53,54,55,57,59,62,63,64,65,67,69,70,72,73,74,75,76,82,83,88,89,90,91,96,99,102,103,106,111,121,122,124,125,131,136,141,145,152,154,158,164,171,172,177,179,183,190,191,193,198,199,205,208,217,221,225,226,228,229,230,234,238,239,240,247,248,250,254,257,258,259,281,285,286,290,293,294,297)
+  
 }  
 
 
-
-tree.print <- function(tr){
-  if(isleaf(tr)){
-  
-  } else {
-    str <- tr[[5]][[2]]
-    print(str)
-    
-    tree.print(tr[[2]])
-    tree.print(tr[[3]])
-  }
-}
-
-runcrossval <- function(trainingset, trainingset.classes, testsample, testsample.classes, runs, nmin, minleaf){
-  totalerrors <- 0
-  totalsize <- c(0,0)
-  totaltime <- 0
-  
-  for (i in 1:runs){
-    start.time <- Sys.time()
-    
-    results <- crossvalidation(trainingset, trainingset.classes, testsample, testsample.classes, nmin, minleaf)
-    
-    end.time <- Sys.time()
-    time.taken <- end.time - start.time
-    totaltime <- totaltime + time.taken
-    
-    for(i in 1:length(results)){
-      row <- results[[i]]
-      totalerrors <- totalerrors + row[[1]]
-      totalsize <- totalsize + row[[2]]
-    }
-  }
-  
-  avgerrors <- totalerrors/(10*runs)
-  avgsize <- totalsize/(10*runs)
-  avgtime <- totaltime/(10*runs)
-  
-  return(c(avgerrors, avgsize, avgtime))
-}
-
-wtf2 <- function(x,y){
-    testsample.indices <- c(5,8,9,11,14,18,19,20,22,23,27,30,33,35,39,41,43,44,46,53,54,55,57,59,62,63,64,65,67,69,70,72,73,74,75,76,82,83,88,89,90,91,96,99,102,103,106,111,121,122,124,125,131,136,141,145,152,154,158,164,171,172,177,179,183,190,191,193,198,199,205,208,217,221,225,226,228,229,230,234,238,239,240,247,248,250,254,257,258,259,281,285,286,290,293,294,297)
-    testsample <- x[(testsample.indices),]
-    testsample.classes <- y[(testsample.indices)]
-    
-    trainingset <- x[-(testsample.indices),]
-    trainingset.indices <- which(rownames(x) %in% rownames(trainingset))
-    trainingset.classes <- y[trainingset.indices]
-    
-    results <- list()
-    for(i in seq(20,10,by=-1)){
-      for(j in seq(ceiling(i/2),1,by=-1)){
-        a <- c(i, j, runcrossval(trainingset, trainingset.classes, testsample, testsample.classes,1,i,j))
-        print(a)
-        results[[length(results)+1]] <- a
-      }
-    }
-    
-
-    print(results)
-}
-
 main()
+
 
