@@ -121,7 +121,7 @@ To quickly find an approximation of good parameter values, we tried all likely v
 
 \clearpage
 \section{Results}
-The final tree, constructed with the parameters $nmin=16$ and $minleaf=8$ can be seen in figure 2. Splits are shown in the labels of edges. The numbers in the nodes mean the amount of instances labeled '0' and the amount of instances labeled '1' respectively. An obvious problem with this tree is the leaf with 6 zero-labeled instances and 11 one-labeled instances. The resubstitution error of this node is $1 - (11/17) \approx 0.35$, which is fairly high. A confusion matrix can be found in figure 2, the estimated errorrate is $0.21$.
+The final tree, constructed with the parameters $nmin=16$ and $minleaf=8$ can be seen in figure 2. Splits are shown in the labels of edges. The numbers in the nodes mean the amount of instances labeled '0' and the amount of instances labeled '1' respectively. An obvious problem with this tree is the leaf with 6 zero-labeled instances and 11 one-labeled instances. The resubstitution error of this node is $1 - (11/17) \approx 0.35$, which is fairly high. A confusion matrix can be found in table 3, the estimated errorrate is $0.21$.
 \\\\
 \tikzset{
   treenode/.style = {align=center, inner sep=0pt, text centered,
