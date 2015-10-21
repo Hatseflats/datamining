@@ -113,6 +113,20 @@ graph.random <- function(prob, nnodes){
   return(graph)
 }  
 
+# graph.compare
+# graph1 - an adjacency matrix.
+# graph2 - an adjacency matrix.
+# returns: A dataframe with x, y and action (1 for adding an edge, -1 for removing an edge).
+# Compares two graphs, to see which edges have been added or deleted by the local search algorithm.
+graph.compare <- function(graph1,graph2){
+  diff <- graph1 - graph2
+  changes <- which(diff == 1 | diff == -1, arr.ind=TRUE)
+
+  action <- apply(changes, 1, function(row) diff[row[1],row[2]])
+
+  return(data.frame(x=changes[,"col"], y=changes[,"row"], action))
+}
+
 # gm.search
 # data - numeric table.
 # graph - an adjacency matrix.
@@ -126,7 +140,44 @@ graph.random <- function(prob, nnodes){
 #  - call: the call to the function gm.search that produced this result.
 # Tries to find a good graphical model by using a local search.
 gm.search <- function(data, graph, forward, backward, score){
-  
+  optimum.graph <- graph
+  optimum.score <- Inf 
+
+  traces <- data.frame(x=integer(),y=integer(),action=integer(),score=double())
+
+  repeat {
+    neighborhood <- graph.neighborhood(optimum.graph, forward, backward)
+
+    # calculate the score given a graph
+    f <- function(graph){
+      cliques <- graph.cliques(graph)
+      return(gm.score(data, cliques, score))
+    }
+
+    scores <- sapply(neighborhood, f)
+
+    new.score <- min(scores)
+    new.graph <- neighborhood[[which.min(scores)]]
+
+    if(new.score < optimum.score){
+      trace <- head(graph.compare(new.graph, optimum.graph),1)
+      traces[nrow(traces)+1,] <- c(trace, new.score)
+
+      optimum.score <- new.score
+      optimum.graph <- new.graph
+    } else {
+      break
+    }
+  }
+
+  result <- list(
+    cliques = graph.cliques(optimum.graph),
+    score = optimum.score,
+    trace = traces,
+    call = match.call()
+  )
+
+  return(result)
 }
 
 # gm.restart
@@ -142,12 +193,34 @@ gm.search <- function(data, graph, forward, backward, score){
 #  - cliques: a list of numeric vectors.
 #  - score: numeric, AIC or BIC score of the final model.
 #  - trace: list of traces of the search process.
-#  - call1: the call to the function gm.search that produced this result.
-#  - call2: the call to the function gm.restart that produced this result.
+#  - call: the call to the function gm.search that produced this result.
+#  - call.restart: the call to the function gm.restart that produced this result.
 # Performs a multistart localsearch to find a good graphical model.
-gm.restart <- function(nstart, prob, seed, data, forward, backward, score, graphsize = 6){
+gm.restart <- function(nstart, prob, seed, data, forward, backward, score, graphsize = 10){
   set.seed(seed)
 
+  optimum.score <- Inf
+  optimum.result <- list()
+
+  for(i in 1:nstart){
+    graph <- graph.random(prob, graphsize)
+
+    result <- gm.search(data, graph, forward, backward, score)
+
+    if(result$score < optimum.score){
+      optimum.score <- result$score
+      if(length(optimum.result) == 0){
+        optimum.result <- c(optimum.result, result)
+      } else {
+        optimum.result <- result
+      }
+    }
+  }
+
+  result <- optimum.result
+  result <- c(result, call.restart=match.call())
+
+  return(result)
 }
 
 # gm.score
@@ -184,13 +257,28 @@ matrix.equal <- function(x, y){
     dim(x) == dim(y) && all(x == y)
 }
 
-coronary.dat <- read.table("~/UU/MDM/datamining/assignment2/data/coronary.txt",header=T)
-  
-t <- table(coronary.dat)
+# format.trace
+# trace - dataframe row with columns: x, y, action, score.
+# returns: string.
+# Properly formats a trace so it can be printed
+format.trace <- function(trace){
+  action <- if (trace[["action"]] == -1 ) "Removed" else "Added"
+  fmt <- "%s: %d - %d (score= %.2f )"
 
-g <- graph.random(0.5, 6)
+  return(sprintf(fmt, action, trace[["x"]], trace[["y"]], trace[["score"]]))
+}
 
-g.n <- graph.neighborhood(g, TRUE, FALSE)
+rhc.dat <- read.csv("~/UU/MDM/datamining/assignment2/data/rhc-small.txt",header=T)
+t <- table(rhc.dat)
 
-print(graph.neighbors(g,2))
+# coronary.dat <- read.table("~/UU/MDM/datamining/assignment2/data/coronary.txt",header=T)
+# t <- table(coronary.dat)
+
+result <- gm.restart(5,0.5,23,t,TRUE,TRUE,"BIC")
+# g <- graph.init(10)
+
+result <- gm.search(t,g,TRUE,TRUE,"BIC")
+print(result)
+
+
 
