@@ -158,10 +158,11 @@ gm.search <- function(data, graph, forward, backward, score){
 
     new.score <- min(scores)
     new.graph <- neighborhood[[which.min(scores)]]
-
     if(new.score < optimum.score){
       trace <- head(graph.compare(new.graph, optimum.graph),1)
       traces[nrow(traces)+1,] <- c(trace, new.score)
+
+      print(format.trace(traces[nrow(traces),]))
 
       optimum.score <- new.score
       optimum.graph <- new.graph
@@ -239,7 +240,6 @@ gm.score <- function(data, cliques, score){
   dim <- length(data) - model$df
   n <- sum(data)
   dev <- model$lrt
-
   if(score == 'AIC'){
     return(dev + 2 * dim)
   } else {
@@ -270,15 +270,16 @@ format.trace <- function(trace){
 
 rhc.dat <- read.csv("~/UU/MDM/datamining/assignment2/data/rhc-small.txt",header=T)
 t <- table(rhc.dat)
+complete <- matrix(1,10,10)
 
-# coronary.dat <- read.table("~/UU/MDM/datamining/assignment2/data/coronary.txt",header=T)
-# t <- table(coronary.dat)
+for(i in 1:10){
+  complete[i,i] <- 0
+}
 
-result <- gm.restart(5,0.5,23,t,TRUE,TRUE,"BIC")
-# g <- graph.init(10)
+empty <- graph.init(10)
 
-result <- gm.search(t,g,TRUE,TRUE,"BIC")
+result <- gm.search(t,complete,TRUE,TRUE,"AIC")
+
 print(result)
-
 
 

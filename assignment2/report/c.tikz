@@ -1,0 +1,32 @@
+\begin{tikzpicture}[ball/.style = {circle, draw, align=center, inner sep=0}, node distance=3cm]
+
+\node[ball](1){1:cat1};
+\node[ball, left of =1](3){3:swang1};
+\node[ball, below of=3](10){10:meanbp1};
+\node[ball, right of=10](2){2:death};
+\node[ball, right of=2](9){9:age};
+\node[ball, right of=1, node distance=2cm](8){8:ca};
+\node[ball, above right of=1](6){6:ninsclas};
+\node[ball, right of=6](7){7:income};
+\node[ball, above left of=3](5){5:race};
+\node[ball, below right of=6](4){4:gender};
+
+\draw [-] (1) to (3);
+\draw [-] (1) to (10);
+\draw [-] (3) to (10);
+\draw [-] (1) to (8);
+\draw [-] (3) to (6);
+\draw [-] (6) to (8);
+\draw [-] (1) to (9);
+\draw [-] (2) to (8);
+\draw [-] (2) to (9);
+\draw [-] (4) to (6);
+\draw [-] (6) to (9);
+\draw [-] (5) to (6);
+\draw [-] (5) to (10);
+\draw [-] (6) to (7);
+\draw [-] (2) to (10);
+
+
+
+\end{tikzpicture}
