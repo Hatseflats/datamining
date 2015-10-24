@@ -89,7 +89,29 @@ Questions:
 			\end{table}
 
 		\item The BIC scoring function penalizes large models more severely than AIC. This also can be seen in the results obtained in (f) compared to (c) and (e). In (e), we found several cliques of size 3, since the AIC function is more willing to add additional edges. Cliques found in (f) and (c) mainly are of size 2. 
-		\item 
+		\item For this experiment we used 487254080, which is a randomly generated number from an online service. As parameters we will try all $prob = \set{0.2, 0.4, 0.6, 0.8}$ with 10 restarts for both scoring functions. The idea behind these parameters is as follows. It is fairly pointless to try multiple restart values, the \textit{gm.restart} function is seeded, so a call with $nstart = 10$ and $nstart = 5$ will cause the second call to generate the same 5 graphs as the first 5 in the first call. Since we use $nstart = 10$, it is also unlikely that trying probability values closer to eachother will yield any interesting results. There will not be much difference between 10 graphs generated with $prob = 0.5$ and $prob = 0.4$. \\ \\
+		For the BIC scoring function, all runs ended with a score of 15783.74. During the earlier experiments without restarts, the best score found with BIC was 15841.66 starting from an empty graph. From the complete graph, a score of 15850.53 was achieved. These results tell us that starting from an empty of complete graph both result in finding a local optimum. It is quite likely that 15783.74 is the global optimum, considering the large amount of restarts. However, to be sure of this we would have to use an exact algorithm.
+		\\
+		The amount of steps required to find the best score differ wildy for each probability. The runs with $prob = 0.2$ and $prob = 0.4$ only required 19 and 16 steps respectively. Meanwhile, the runs with $prob = 0.6$ and $prob = 0.8 $ required 27 and 33 steps. 
+		\\\\
+		The run with the AIC scoring function all ended with the same score aswell. The best score found was 14263.97 for all probabilities tried. Once more, this is lower than the score found in earlier experiments (14278.21). For all runs, the amount of steps required was between 21 and 29.
+		This indicates that this dataset in particular does not contain a lot of local optimums in which the multi-start local search algorithm can get stuck.
+		The best AIC model can be seen in figure \ref{fig:h1} and the BIC model in figure \ref{fig:h2}.
+		
+			\begin{figure}
+				\centering
+				\input{h1.tikz}
+				\caption{Independence graph found with the AIC function in (h).}
+		        \label{fig:h1}
+			\end{figure}
+
+			\begin{figure}
+				\centering
+				\input{h2.tikz}
+				\caption{Independence graph found with the BIC function in (h).}
+		        \label{fig:h2}
+			\end{figure}
+
 	\end{enumerate}
 \end{document}
 

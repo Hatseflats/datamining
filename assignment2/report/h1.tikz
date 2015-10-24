@@ -1,35 +1,61 @@
 \begin{tikzpicture}[ball/.style = {circle, draw, align=center, inner sep=0}, node distance=3cm]
 
 \node[ball](1){1:cat1};
-\node[ball, above of=1](3){3:swang1};
 \node[ball, below of=1](10){10:meanbp1};
 \node[ball, below left of=1](2){2:death};
 \node[ball, below right of=10](9){9:age};
-\node[ball, below left of=10](5){5:race};
 
-\node[ball, left of=5](7){7:income};
+\node[ball, below left of=2](7){7:income};
 
 \node[ball, below of=7](6){6:ninsclas};
+\node[ball, below left of=7](5){5:race};
+
 \node[ball, right of=9](4){4:gender};
 \node[ball, left of =2,node distance=5cm](8){8:ca};
+\node[ball, below right of=9](3){3:swang1};
+
+\draw [-] (3) to (4);
+\draw [-] (1) to (4);
+\draw [-] (4) to (8);
 
 \draw [-] (1) to (8);
-\draw [-] (1) to (3);
-\draw [-] (1) to (10);
-\draw [-] (10) to (3);
-\draw [-] (2) to (7);
+\draw [-] (1) to (2);
 \draw [-] (2) to (8);
+
+\draw [-] (1) to (9);
 \draw [-] (2) to (9);
+
+\draw [-] (1) to (3);
+\draw [-] (3) to (9);
+
+
 \draw [-] (2) to (10);
-\draw [-] (4) to (3);
-\draw [-] (9) to (3);
+\draw [-] (1) to (10);
+
+\draw [-] (3) to (10);
+\draw [-] (2) to (7);
+\draw [-] (3) to (7);
+
+
+
+\draw [-] (4) to (5);
 \draw [-] (4) to (6);
-\draw [-] (5) to (7);
-\draw [-] (5) to (9);
-\draw [-] (5) to (10);
-\draw [-] (6) to (7);
+\draw [-] (5) to (6);
+
 \draw [-] (6) to (8);
+\draw [-] (1) to (8);
+
+
+\draw [-] (6) to (7);
+\draw [-] (5) to (7);
+
 \draw [-] (6) to (9);
+\draw [-] (5) to (9);
+
+\draw [-] (5) to (10);
+\draw [-] (6) to (10);
+
+
 
 
 
